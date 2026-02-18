@@ -538,18 +538,20 @@ function PersonCard({ role, name, detail }: PersonCardProps) {
 }
 
 // Verification Section Component
+type VerificationData = {
+  collegeIdFile: File | null;
+  aadhaar: string;
+  selfieCaptured: boolean;
+  otp: string;
+  otpVerified: boolean;
+};
+
 function VerificationSection({
   data,
   onChange,
 }: {
-  data: {
-    collegeIdFile: File | null;
-    aadhaar: string;
-    selfieCaptured: boolean;
-    otp: string;
-    otpVerified: boolean;
-  };
-  onChange: (data: typeof data) => void;
+  data: VerificationData;
+  onChange: (data: VerificationData) => void;
 }) {
   const isComplete =
     data.collegeIdFile !== null &&
@@ -687,16 +689,18 @@ function VerificationSection({
 }
 
 // Registration Section Component
+type RegistrationData = {
+  teamName: string;
+  problemStatement: string;
+  round1PPT: File | null;
+};
+
 function RegistrationSection({
   data,
   onChange,
 }: {
-  data: {
-    teamName: string;
-    problemStatement: string;
-    round1PPT: File | null;
-  };
-  onChange: (data: typeof data) => void;
+  data: RegistrationData;
+  onChange: (data: RegistrationData) => void;
 }) {
   const problemStatements = [
     "Build an AI-powered learning assistant",
