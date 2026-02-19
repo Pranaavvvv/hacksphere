@@ -1,3 +1,8 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+
 const sampleTeams = [
   {
     name: "Zero Knowledge Ninjas",
@@ -23,6 +28,20 @@ const sampleTeams = [
 ];
 
 export default function AdminDashboard() {
+  const router = useRouter()
+
+  useEffect(() => {
+    // Check if user is admin
+    if (typeof window !== "undefined") {
+      const role = localStorage.getItem("hacksphere_role")
+      const authToken = localStorage.getItem("hacksphere_auth_token")
+      
+      if (!authToken || role !== "admin") {
+        router.push("/auth")
+      }
+    }
+  }, [router])
+
   return (
     <div className="mx-auto max-w-6xl px-5 pb-16 pt-8 md:px-8">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -426,4 +445,3 @@ function StatChip({ label, value, tone = "default" }: StatChipProps) {
     </div>
   );
 }
-

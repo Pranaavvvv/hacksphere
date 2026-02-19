@@ -396,7 +396,7 @@ export default function HackathonDetail({ params }: HackathonPageProps) {
                 approved, you can register your team and select a problem statement.
               </p>
               <Link
-                href="/signup"
+                href="/auth"
                 className="mt-3 inline-flex rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
               >
                 Sign up & verify →

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Figtree, Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "./Navbar";
+import "./landing/landing-theme.css";
+import NavbarWrapper from "./NavbarWrapper";
+import FooterWrapper from "./FooterWrapper";
 import { AuthProvider } from "./AuthContext";
 
 const geistSans = Geist({
@@ -12,6 +15,17 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const figtree = Figtree({
+  subsets: ["latin"],
+  variable: "--font-figtree",
+  weight: ["400", "500", "600"],
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -28,26 +42,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900 overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${figtree.variable} antialiased bg-slate-50 text-slate-900 overflow-x-hidden`}
       >
         <AuthProvider>
           <div className="min-h-screen flex flex-col">
-            <Navbar />
+            {/* Navbar is conditionally rendered - excluded for landing page (/) */}
+            <NavbarWrapper />
 
             <main className="flex-1 bg-slate-50">{children}</main>
 
-            <footer className="border-t border-slate-200 bg-white">
-              <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-4 text-xs text-slate-500 md:flex-row md:px-8">
-                <span>
-                  © {new Date().getFullYear()} HackSphere. All rights reserved.
-                </span>
-                <div className="flex gap-4">
-                  <span>Privacy</span>
-                  <span>Terms</span>
-                  <span>Support</span>
-                </div>
-              </div>
-            </footer>
+            {/* Footer is conditionally rendered - excluded for landing page (/) */}
+            <FooterWrapper />
           </div>
         </AuthProvider>
       </body>

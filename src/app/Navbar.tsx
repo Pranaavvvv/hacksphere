@@ -5,13 +5,18 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
 
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/hackathons", label: "Hackathons" },
-  { href: "/student/verification", label: "Verification" },
-  { href: "/student/pass", label: "My QR Pass" },
-  { href: "/judge", label: "Judging" },
-  { href: "/admin", label: "Admin" },
+// Base nav items - will be filtered by role
+const allNavItems = [
+  // Student items
+  { href: "/home", label: "Home", roles: ["student", "organizer"] },
+  { href: "/hackathons", label: "Hackathons", roles: ["student", "organizer"] },
+  { href: "/student/verification", label: "Verification", roles: ["student"] },
+  { href: "/student/pass", label: "My QR Pass", roles: ["student"] },
+  // Organizer items
+  { href: "/organizer/dashboard", label: "Dashboard", roles: ["organizer"] },
+  { href: "/organizer/create", label: "Create Hackathon", roles: ["organizer"] },
+  // Admin items
+  { href: "/admin", label: "Dashboard", roles: ["admin"] },
 ];
 
 export default function Navbar() {
@@ -19,6 +24,75 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { user, signOut } = useAuth();
+  
+  // Don't render navbar on landing page (/), auth, or onboarding - they have their own navbars
+  if (pathname === "/" || pathname === "/auth" || pathname === "/onboarding") {
+    return null;
+  }
+  
+  // Get user role from localStorage
+  const [userRole, setUserRole] = useState<string | null>(null);
+  
+  // Function to check and update user state
+  const checkAuthState = () => {
+    if (typeof window !== "undefined") {
+      const role = localStorage.getItem("hacksphere_role");
+      const authToken = localStorage.getItem("hacksphere_auth_token");
+      const hacksphereUser = localStorage.getItem("hacksphere_user");
+      
+      setUserRole(role);
+      
+      // Also update AuthContext user if needed
+      if (authToken && hacksphereUser && !user) {
+        try {
+          const userData = JSON.parse(hacksphereUser);
+          // Trigger AuthContext update by dispatching custom event
+          window.dispatchEvent(new Event("auth-state-changed"));
+        } catch (e) {
+          console.error("Error parsing user data:", e);
+        }
+      }
+    }
+  };
+  
+  useEffect(() => {
+    checkAuthState();
+  }, [user]);
+  
+  // Filter nav items based on role
+  const filteredNavItems = allNavItems.filter((item) => {
+    if (!userRole) {
+      // When not logged in, show public items (Home, Hackathons)
+      return item.roles.includes("student") && ["/home", "/hackathons"].includes(item.href);
+    }
+    return item.roles.includes(userRole);
+  });
+  
+  // Listen for storage changes and custom auth events to update navbar when role changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      checkAuthState();
+    };
+    
+    const handleAuthStateChange = () => {
+      checkAuthState();
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("auth-state-changed", handleAuthStateChange);
+    // Also check on focus in case localStorage was updated in same tab
+    window.addEventListener("focus", handleStorageChange);
+    
+    // Poll for changes every 2 seconds (fallback)
+    const interval = setInterval(checkAuthState, 2000);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("auth-state-changed", handleAuthStateChange);
+      window.removeEventListener("focus", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [user]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -28,6 +102,9 @@ export default function Navbar() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Check if student role for centered navbar
+  const isStudent = userRole === "student"
 
   return (
     <header className="sticky top-0 z-40 bg-white backdrop-blur">
@@ -54,18 +131,20 @@ export default function Navbar() {
 
         {/* Desktop pill navbar */}
         <div
-          className={`hidden max-w-full items-center justify-between rounded-full border border-slate-200 bg-white/90 px-4 text-[0.95rem] text-slate-600 shadow-sm transition-all md:flex ${
+          className={`hidden max-w-full items-center rounded-full border border-slate-200 bg-white/90 px-4 text-[0.95rem] text-slate-600 shadow-sm transition-all md:flex ${
             scrolled ? "py-1" : "py-2"
+          } ${
+            isStudent ? "justify-center" : "justify-between"
           }`}
           style={{
             transform: scrolled ? "scale(0.97)" : "scale(1)",
           }}
         >
           <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const active =
-                item.href === "/"
-                  ? pathname === "/"
+                item.href === "/home"
+                  ? pathname === "/home"
                   : pathname.startsWith(item.href);
               return (
                 <Link
@@ -97,20 +176,12 @@ export default function Navbar() {
                 </button>
               </>
             ) : (
-              <>
-                <Link
-                  href="/signin"
-                  className="rounded-full px-3 py-1 text-[0.8rem] font-medium hover:bg-slate-100"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/hackathons/create"
-                  className="rounded-full bg-blue-600 px-3 py-1 text-[0.8rem] font-semibold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Create
-                </Link>
-              </>
+              <Link
+                href="/auth"
+                className="rounded-full px-3 py-1 text-[0.8rem] font-medium hover:bg-slate-100"
+              >
+                Sign in
+              </Link>
             )}
           </div>
         </div>
@@ -148,10 +219,10 @@ export default function Navbar() {
         <div className="mx-auto mt-1 w-full max-w-6xl px-5 pb-3 md:hidden">
           <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm shadow-md">
             <nav className="flex flex-col gap-1">
-              {navItems.map((item) => {
+              {filteredNavItems.map((item) => {
                 const active =
-                  item.href === "/"
-                    ? pathname === "/"
+                  item.href === "/home"
+                    ? pathname === "/home"
                     : pathname.startsWith(item.href);
                 return (
                   <Link
@@ -181,24 +252,15 @@ export default function Navbar() {
                 >
                   Sign out
                 </button>
-              ) : (
-                <>
+                ) : (
                   <Link
-                    href="/signin"
+                    href="/auth"
                     onClick={() => setOpen(false)}
-                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
                     Sign in
                   </Link>
-                  <Link
-                    href="/hackathons/create"
-                    onClick={() => setOpen(false)}
-                    className="flex-1 rounded-xl bg-blue-600 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-blue-700"
-                  >
-                    Create
-                  </Link>
-                </>
-              )}
+                )}
             </div>
           </div>
         </div>

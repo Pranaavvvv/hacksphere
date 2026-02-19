@@ -9,7 +9,7 @@ import { Footer } from "@/components/Footer"
 
 export default function LandingPage() {
   return (
-    <div className="landing-theme min-h-screen">
+    <>
       <PortfolioNavbar />
       <section id="home">
         <ProductTeaserCard />
@@ -30,6 +30,6 @@ export default function LandingPage() {
         <FAQSection />
       </section>
       <Footer />
-    </div>
+    </>
   )
 }
