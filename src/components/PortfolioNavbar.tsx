@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
 const navigationLinks = [
   {
     name: "Features",
@@ -24,8 +25,11 @@ const navigationLinks = [
 
 // @component: PortfolioNavbar
 export const PortfolioNavbar = () => {
+  const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20)
@@ -33,19 +37,38 @@ export const PortfolioNavbar = () => {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+  
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
   }
+  
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
   }
+  
   const handleLinkClick = (href: string) => {
     closeMobileMenu()
-    const element = document.querySelector(href)
-    if (element) {
-      element.scrollIntoView({
-        behavior: "smooth",
-      })
+    
+    // If we're on the landing page, scroll to the section
+    if (pathname === "/") {
+      const element = document.querySelector(href)
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+        })
+      }
+    } else {
+      // If we're on another page (like /auth), redirect to landing page with hash
+      router.push(`/${href}`)
+      // Scroll to section after navigation completes
+      setTimeout(() => {
+        const element = document.querySelector(href)
+        if (element) {
+          element.scrollIntoView({
+            behavior: "smooth",
+          })
+        }
+      }, 500)
     }
   }
 
@@ -58,7 +81,13 @@ export const PortfolioNavbar = () => {
         <div className="flex items-center justify-between h-16 sm:h-20">
           <div className="flex-shrink-0">
             <button
-              onClick={() => handleLinkClick("#home")}
+              onClick={() => {
+                if (pathname === "/") {
+                  handleLinkClick("#home")
+                } else {
+                  router.push("/")
+                }
+              }}
               className="text-2xl font-bold text-foreground hover:text-primary transition-colors duration-200"
               style={{
                 fontFamily: "Plus Jakarta Sans, sans-serif",
