@@ -1,114 +1,141 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
+import api from "@/lib/api";
 
-type User = {
+// ── Types ─────────────────────────────────────────────────────────
+export interface User {
+  id: string;
+  _id?: string;
   name: string;
   email: string;
-};
+  role: "student" | "organizer" | "admin" | "judge";
+  hackathonId?: string;
+}
 
-type AuthContextValue = {
+interface AuthContextType {
   user: User | null;
-  signIn: (user: User) => void;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<User>;
+  signUp: (name: string, email: string, password: string, role: string) => Promise<User>;
   signOut: () => void;
-};
+}
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  signIn: async () => {
+    throw new Error("AuthContext not initialized");
+  },
+  signUp: async () => {
+    throw new Error("AuthContext not initialized");
+  },
+  signOut: () => {},
+});
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-
-  const checkAndSetUser = () => {
-    if (typeof window === "undefined") return;
-    
-    // Check for hacksphere_user (from auth page) or hs-user (legacy)
-    const hacksphereUser = window.localStorage.getItem("hacksphere_user");
-    const legacyUser = window.localStorage.getItem("hs-user");
-    const authToken = window.localStorage.getItem("hacksphere_auth_token");
-    
-    if (hacksphereUser && authToken) {
-      try {
-        const userData = JSON.parse(hacksphereUser);
-        // Extract name and email from userData
-        const user: User = {
-          name: userData.name || userData.email?.split("@")[0] || "User",
-          email: userData.email || "",
-        };
-        setUser(user);
-        // Also sync to hs-user for compatibility
-        window.localStorage.setItem("hs-user", JSON.stringify(user));
-      } catch {
-        window.localStorage.removeItem("hacksphere_user");
-      }
-    } else if (legacyUser) {
-      try {
-        setUser(JSON.parse(legacyUser));
-      } catch {
-        window.localStorage.removeItem("hs-user");
-      }
-    } else {
-      setUser(null);
-    }
+// ── Helper: normalize user object from API ────────────────────────
+function normalizeUser(raw: Record<string, unknown>): User {
+  return {
+    id: (raw._id as string) || (raw.id as string) || "",
+    name: (raw.name as string) || "",
+    email: (raw.email as string) || "",
+    role: (raw.role as User["role"]) || "student",
+    hackathonId: (raw.hackathonId as string) || undefined,
   };
+}
 
+// ── Provider ──────────────────────────────────────────────────────
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Restore session from localStorage on mount
   useEffect(() => {
-    checkAndSetUser();
-    
-    // Listen for auth state changes
-    const handleAuthStateChange = () => {
-      checkAndSetUser();
-    };
-    
-    window.addEventListener("auth-state-changed", handleAuthStateChange);
-    window.addEventListener("storage", handleAuthStateChange);
-    
-    // Poll for changes every 2 seconds (fallback)
-    const interval = setInterval(checkAndSetUser, 2000);
-    
-    return () => {
-      window.removeEventListener("auth-state-changed", handleAuthStateChange);
-      window.removeEventListener("storage", handleAuthStateChange);
-      clearInterval(interval);
-    };
+    try {
+      const token = localStorage.getItem("hacksphere_auth_token");
+      const raw = localStorage.getItem("hacksphere_user");
+      if (token && raw) {
+        const parsed = JSON.parse(raw);
+        setUser(normalizeUser(parsed));
+      }
+    } catch {
+      // Corrupt data — clear
+      localStorage.removeItem("hacksphere_auth_token");
+      localStorage.removeItem("hacksphere_user");
+      localStorage.removeItem("hacksphere_role");
+    }
+    setLoading(false);
   }, []);
 
-  const signIn = (u: User) => {
-    setUser(u);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("hs-user", JSON.stringify(u));
-      // Also sync to hacksphere_user for compatibility
-      const hacksphereUser = {
-        name: u.name,
-        email: u.email,
-        createdAt: new Date().toISOString(),
-      };
-      window.localStorage.setItem("hacksphere_user", JSON.stringify(hacksphereUser));
-      window.localStorage.setItem("hacksphere_auth_token", "temp_token_" + Date.now());
-    }
-  };
+  // ── Sign In ─────────────────────────────────────────────────────
+  const signIn = useCallback(async (email: string, password: string): Promise<User> => {
+    const data = await api.post("/api/auth/login", { email, password });
 
-  const signOut = () => {
+    const token: string = data.token;
+    const normalized = normalizeUser(data.user);
+
+    localStorage.setItem("hacksphere_auth_token", token);
+    localStorage.setItem("hacksphere_user", JSON.stringify(data.user));
+    localStorage.setItem("hacksphere_role", normalized.role);
+    // Legacy compat
+    localStorage.setItem("hs-user", JSON.stringify(data.user));
+
+    setUser(normalized);
+    window.dispatchEvent(new Event("auth-state-changed"));
+
+    return normalized;
+  }, []);
+
+  // ── Sign Up ─────────────────────────────────────────────────────
+  const signUp = useCallback(
+    async (name: string, email: string, password: string, role: string): Promise<User> => {
+      const data = await api.post("/api/auth/register", {
+        name,
+        email,
+        password,
+        role,
+      });
+
+      const token: string = data.token;
+      const normalized = normalizeUser(data.user);
+
+      localStorage.setItem("hacksphere_auth_token", token);
+      localStorage.setItem("hacksphere_user", JSON.stringify(data.user));
+      localStorage.setItem("hacksphere_role", normalized.role);
+      localStorage.setItem("hs-user", JSON.stringify(data.user));
+
+      setUser(normalized);
+      window.dispatchEvent(new Event("auth-state-changed"));
+
+      return normalized;
+    },
+    []
+  );
+
+  // ── Sign Out ────────────────────────────────────────────────────
+  const signOut = useCallback(() => {
+    localStorage.removeItem("hacksphere_auth_token");
+    localStorage.removeItem("hacksphere_user");
+    localStorage.removeItem("hacksphere_role");
+    localStorage.removeItem("hs-user");
     setUser(null);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("hs-user");
-      window.localStorage.removeItem("hacksphere_user");
-      window.localStorage.removeItem("hacksphere_auth_token");
-      window.localStorage.removeItem("hacksphere_role");
-    }
-  };
+    window.dispatchEvent(new Event("auth-state-changed"));
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return ctx;
+  return useContext(AuthContext);
 }
-

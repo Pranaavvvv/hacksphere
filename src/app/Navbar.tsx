@@ -12,6 +12,7 @@ const allNavItems = [
   { href: "/hackathons", label: "Hackathons", roles: ["student", "organizer"] },
   { href: "/student/verification", label: "Verification", roles: ["student"] },
   { href: "/student/pass", label: "My QR Pass", roles: ["student"] },
+  { href: "/student/meal-passes", label: "Meal Passes", roles: ["student"] },
   // Organizer items
   { href: "/organizer/dashboard", label: "Dashboard", roles: ["organizer"] },
   { href: "/organizer/create", label: "Create Hackathon", roles: ["organizer"] },

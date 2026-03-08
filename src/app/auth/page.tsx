@@ -4,12 +4,14 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { PortfolioNavbar } from "@/components/PortfolioNavbar"
 import { Footer } from "@/components/Footer"
+import { useAuth } from "@/app/AuthContext"
 
 type UserRole = "admin" | "student" | "organizer"
 type AuthMode = "login" | "signup"
 
 export default function AuthPage() {
   const router = useRouter()
+  const { signIn, signUp } = useAuth()
   const [mode, setMode] = useState<AuthMode>("login")
   const [role, setRole] = useState<UserRole | null>(null)
   const [email, setEmail] = useState("")
@@ -30,81 +32,48 @@ export default function AuthPage() {
       return
     }
 
-    if (mode === "signup") {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match")
-        setLoading(false)
-        return
-      }
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters")
-        setLoading(false)
-        return
-      }
-      if (!name.trim()) {
-        setError("Name is required")
-        setLoading(false)
-        return
-      }
+    try {
+      if (mode === "signup") {
+        if (password !== confirmPassword) {
+          setError("Passwords do not match")
+          setLoading(false)
+          return
+        }
+        if (password.length < 8) {
+          setError("Password must be at least 8 characters")
+          setLoading(false)
+          return
+        }
+        if (!name.trim()) {
+          setError("Name is required")
+          setLoading(false)
+          return
+        }
 
-      // Simulate signup - store user data
-      const userData = {
-        email,
-        name,
-        role,
-        createdAt: new Date().toISOString(),
-      }
-      localStorage.setItem("hacksphere_user", JSON.stringify(userData))
-      localStorage.setItem("hacksphere_auth_token", "temp_token_" + Date.now())
+        await signUp(name, email, password, role)
+        router.push(`/onboarding?role=${role}`)
+      } else {
+        if (!email || !password) {
+          setError("Email and password are required")
+          setLoading(false)
+          return
+        }
 
-      // Redirect to onboarding
-      router.push(`/onboarding?role=${role}`)
-    } else {
-      // Simulate login
-      if (!email || !password) {
-        setError("Email and password are required")
-        setLoading(false)
-        return
-      }
+        const user = await signIn(email, password)
 
-      localStorage.setItem("hacksphere_auth_token", "temp_token_" + Date.now())
-      localStorage.setItem("hacksphere_role", role)
-      
-      // Also sync user data for AuthContext
-      const userData = {
-        email,
-        name: email.split("@")[0] || "User",
-        role,
-        createdAt: new Date().toISOString(),
+        const redirects: Record<string, string> = {
+          admin: "/admin",
+          student: "/home",
+          organizer: "/organizer/dashboard",
+        }
+        router.push(redirects[user.role] || "/home")
       }
-      localStorage.setItem("hacksphere_user", JSON.stringify(userData))
-      
-      // Also sync to hs-user for AuthContext compatibility
-      const authUser = {
-        name: userData.name,
-        email: userData.email,
-      }
-      localStorage.setItem("hs-user", JSON.stringify(authUser))
-      
-      // Dispatch custom event to notify AuthContext
-      window.dispatchEvent(new Event("auth-state-changed"))
-
-      // Redirect based on role
-      const redirects: Record<UserRole, string> = {
-        admin: "/admin",
-        student: "/home",
-        organizer: "/organizer/dashboard",
-      }
-      
-      // Small delay to ensure localStorage is set before redirect
-      setTimeout(() => {
-        router.push(redirects[role])
-        // Trigger auth state update
-        window.dispatchEvent(new Event("auth-state-changed"))
-      }, 50)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong"
+      setError(message)
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
